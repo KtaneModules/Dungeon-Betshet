@@ -292,6 +292,7 @@ public class DungeonScript : MonoBehaviour {
 		}
 		if (stage > 15)
 			DecreaseLevel ();
+		Debug.LogFormat ("[Dungeon #{0}] End of fight : Sword hits = {1}, Blocks = {2}, Last monster fought = {3}", moduleId, swordHits,blocks,currentFight);
 		Debug.LogFormat ("[Dungeon #{0}] Stage {1}", moduleId, stage);
 		Debug.LogFormat ("[Dungeon #{0}] State = {1}", moduleId, currentState);
 		Debug.LogFormat ("[Dungeon #{0}] Level = {1}", moduleId, level);
