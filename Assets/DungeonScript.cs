@@ -49,7 +49,8 @@ public class DungeonScript : MonoBehaviour {
 	public int[][] monsterCodex = { 
 		new int[] { 1, 2, 3, 4 },
 		new int[] { 5, 6, 7, 8 },
-		new int[] { 9, 10, 11, 12 }
+		new int[] { 9, 10, 11, 12 },
+		new int[] {13}
 	};
 
 	public int currentFight = 0;
@@ -190,53 +191,58 @@ public class DungeonScript : MonoBehaviour {
 	void Move(int direction){
 		GetComponent<KMAudio>().PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.ButtonPress, transform);
 		if (!moduleSolved) {
-			if (currentState < 3) {
-				if (direction == 1) {
-					stage++;
-					ChangeLevel ();
-					FindState ();
-				} else
-					GetComponent<KMBombModule> ().HandleStrike ();
+			if (didntFight == nextFight) {
+				if (levelBuffer == 1)
+					IncreaseLevel ();
+				if (levelBuffer == -1)
+					DecreaseLevel ();
+				levelBuffer = 0;
+				Combat ();
+				didntFight = 0;
+				nextFight = rand.Next (1, 4);
 			} else {
-				if (currentState >= 3 && currentState < 7) {
-					if (direction == 2) {
+				didntFight++;
+				if (currentState < 3) {
+					if (direction == 1) {
 						stage++;
 						ChangeLevel ();
 						FindState ();
-					} else
+					} else {
 						GetComponent<KMBombModule> ().HandleStrike ();
+						Debug.LogFormat ("[Dungeon #{0}] Wrong move : the state is {1}, the correct direction was left.", moduleId, currentState);
+					}
 				} else {
-					if (currentState >= 7) {
-						if (direction == 3) {
+					if (currentState >= 3 && currentState < 7) {
+						if (direction == 2) {
 							stage++;
 							ChangeLevel ();
 							FindState ();
-						} else
+						} else {
 							GetComponent<KMBombModule> ().HandleStrike ();
+							Debug.LogFormat ("[Dungeon #{0}] Wrong move : the state is {1}, the correct direction was forward.", moduleId, currentState);
+						}
+					} else {
+						if (currentState >= 7) {
+							if (direction == 3) {
+								stage++;
+								ChangeLevel ();
+								FindState ();
+							} else {
+								GetComponent<KMBombModule> ().HandleStrike ();
+								Debug.LogFormat ("[Dungeon #{0}] Wrong move : the state is {1}, the correct direction was right.", moduleId, currentState);
+							}
+						}
 					}
 				}
-			}
-			if (stage == 23) {
-				moduleSolved = true;
-				GetComponent<KMBombModule> ().HandlePass ();
-			} else {
-				if (didntFight == nextFight) {
-					if (levelBuffer == 1)
-						IncreaseLevel ();
-					if (levelBuffer == -1)
-						DecreaseLevel ();
-					levelBuffer = 0;
-					Combat ();
-					didntFight = 0;
-					nextFight = rand.Next (1, 4);
+
+				if (stage == 23) {
+					moduleSolved = true;
+					GetComponent<KMBombModule> ().HandlePass ();
 				} else {
-					didntFight++;
 					Debug.LogFormat ("[Dungeon #{0}] Stage {1}", moduleId, stage);
 					Debug.LogFormat ("[Dungeon #{0}] State = {1}", moduleId, currentState);
 					Debug.LogFormat ("[Dungeon #{0}] Level = {1}", moduleId, level);
 				}
-
-
 			}
 		}
 
@@ -246,11 +252,28 @@ public class DungeonScript : MonoBehaviour {
 	void Action(int action){
 		GetComponent<KMAudio>().PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.ButtonPress, transform);
 		if (!moduleSolved) {
-			if (inCombat == false)
+			if (inCombat == false) {
 				GetComponent<KMBombModule> ().HandleStrike ();
+				Debug.LogFormat ("[Dungeon #{0}] Wrong action : there is no combat.", moduleId);
+			}
 			else {
 				if (Codex (currentFight) [currentAction] != action) {
 					GetComponent<KMBombModule> ().HandleStrike ();
+					if (Codex (currentFight) [currentAction] == shield) {
+						Debug.LogFormat ("[Dungeon #{0}] Wrong action : the action #{1} against that monster was block.", moduleId, currentAction);
+					}
+					if (Codex (currentFight) [currentAction] == sword) {
+						Debug.LogFormat ("[Dungeon #{0}] Wrong action : the action #{1} against that monster was sword.", moduleId, currentAction);
+					}
+					if (Codex (currentFight) [currentAction] == forward) {
+						Debug.LogFormat ("[Dungeon #{0}] Wrong action : the action #{1} against that monster was forward.", moduleId, currentAction);
+					}
+					if (Codex (currentFight) [currentAction] == left) {
+						Debug.LogFormat ("[Dungeon #{0}] Wrong action : the action #{1} against that monster was left.", moduleId, currentAction);
+					}
+					if (Codex (currentFight) [currentAction] == right) {
+						Debug.LogFormat ("[Dungeon #{0}] Wrong action : the action #{1} against that monster was right.", moduleId, currentAction);
+					}
 				} else {
 					if (action == sword)
 						swordHits++;
@@ -267,12 +290,24 @@ public class DungeonScript : MonoBehaviour {
 
 	void Combat(){
 		inCombat = true;
+		bool found = false;
 		led.material = ledColor;
 		led.transform.GetChild(0).GetComponent<Light>().color = Color.white;
 		for (int i = 0; i < 4; i++) {
 			if (monsterCodex [level - 1] [i] != 0) {
 				currentFight = monsterCodex [level - 1] [i];
+				monsterCodex [level - 1] [i] = 0;
+				found = true;
 				break;
+			}
+		}
+		if (found == false) {
+			if (level < 3) {
+				IncreaseLevel ();
+				Combat ();
+				DecreaseLevel ();				
+			} else {
+				currentFight = monsterCodex [3] [0];
 			}
 		}
 		Codex (currentFight);
@@ -281,17 +316,16 @@ public class DungeonScript : MonoBehaviour {
 
 	void EndCombat(){
 		inCombat = false;
+
 		currentAction = 0;
 		led.material = ledUnlit;
 		led.transform.GetChild(0).GetComponent<Light>().color = Color.black;
-		for (int i = 0; i < 4; i++) {
-			if (monsterCodex [level - 1] [i] != 0) {
-				monsterCodex [level - 1] [i] = 0;
-				break;
-			}
-		}
+
 		if (stage > 15)
 			DecreaseLevel ();
+		stage++;
+		ChangeLevel ();
+		FindState ();
 		Debug.LogFormat ("[Dungeon #{0}] End of fight : Sword hits = {1}, Blocks = {2}, Last monster fought = {3}", moduleId, swordHits,blocks,currentFight);
 		Debug.LogFormat ("[Dungeon #{0}] Stage {1}", moduleId, stage);
 		Debug.LogFormat ("[Dungeon #{0}] State = {1}", moduleId, currentState);
